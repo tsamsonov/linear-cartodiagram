@@ -124,7 +124,7 @@ window.onload = () => {
         style: 'mapbox://styles/mapbox/dark-v9', // mapbox tiles location
         // style: 'https://maps.tilehosting.com/styles/darkmatter/style.json?key=9jsySrA6E6EKeAPy7tod', // tiles from tilehosting.com
         center: [37.64, 55.75],
-        zoom: 8
+        zoom: 10
     });
 
     map.on('load', () => {
@@ -237,15 +237,6 @@ window.onload = () => {
             // store input file in variable
             cargoTable = inputFileElement.files[0];
 
-            // test project function
-            // let pt1 = edges.features[0].geometry.coordinates[0];
-            // let pt2 = edges.features[1].geometry.coordinates[0];
-            
-            // console.log(pt1, pt2);
-            // let pt1px = map.project(pt1);
-            // let pt2px = map.project(pt2);
-            // console.log(pt1px, pt2px);
-
             // hide loading panel
             loadingDataPanel.classList.add('hidden');
 
@@ -291,7 +282,7 @@ window.onload = () => {
             Object(_modules_edges__WEBPACK_IMPORTED_MODULE_3__["fillOrigLines"])(linesIDArray, origLines, edges);
 
             // set default values for width of edges
-            let minWidthDefault = 2, maxWidthDefault = 20;
+            let minWidthDefault = 20, maxWidthDefault = 100;
 
             minWidthInput.value = minWidthDefault;
             maxWidthInput.value = maxWidthDefault;
@@ -312,14 +303,16 @@ window.onload = () => {
 
             // calculate node radius
             nodes.features.forEach(node => {
-                Object(_modules_nodes__WEBPACK_IMPORTED_MODULE_4__["bindEdgesInfoToNodes"])(node, edges);
+                Object(_modules_nodes__WEBPACK_IMPORTED_MODULE_4__["bindEdgesInfoToNodes"])(node, edges, map);
                 Object(_modules_nodes__WEBPACK_IMPORTED_MODULE_4__["addNodeAttr"])(origLines, node, cargoTypes, map);
             });
+
+            let multipleCargoNodesObject = Object(_modules_nodes__WEBPACK_IMPORTED_MODULE_4__["createMultipleCargoNodesObject"])(cargoTypes, nodes);
 
             // render background lines
             // renderBackgroundLines(map, origLines, origLineWidth);
             // render edges
-            Object(_modules_render__WEBPACK_IMPORTED_MODULE_5__["renderEdges"])(map, edges, cargoColorArray, nodes);
+            Object(_modules_render__WEBPACK_IMPORTED_MODULE_5__["renderEdges"])(map, edges, cargoColorArray, nodes, multipleCargoNodesObject);
             // render original lines
             Object(_modules_render__WEBPACK_IMPORTED_MODULE_5__["renderOrigLines"])(map, origLines, origLineWidth);
             // render nodes
@@ -329,7 +322,7 @@ window.onload = () => {
             Object(_modules_interface__WEBPACK_IMPORTED_MODULE_6__["createColorTable"])(colorTableBody, cargoColorArray, edges, map);
 
             // create width slider
-            Object(_modules_interface__WEBPACK_IMPORTED_MODULE_6__["createSlider"])(widthSlider, minWidthDefault, maxWidthDefault, 100);
+            Object(_modules_interface__WEBPACK_IMPORTED_MODULE_6__["createSlider"])(widthSlider, minWidthDefault, maxWidthDefault, 200);
 
             // initialize render counter
             let startRenderCounter = 0;
@@ -346,12 +339,11 @@ window.onload = () => {
 
                 if (handle) {
                     maxWidthInput.value = Math.round(value);
-                    updateSliderHandler();
-
                 } else {
                     minWidthInput.value = Math.round(value);
-                    updateSliderHandler();
                 }
+
+                updateSliderHandler();
             });
 
             // bind change listeners to width inputs
@@ -402,17 +394,24 @@ window.onload = () => {
 
             // function to update map when slider updates
             function updateSliderHandler() {
+                const currZoom = map.getZoom();
                 widthArray = Object(_modules_edges__WEBPACK_IMPORTED_MODULE_3__["getWidthArray"])(+minWidthInput.value, +maxWidthInput.value);
                 Object(_modules_edges__WEBPACK_IMPORTED_MODULE_3__["calculateWidth"])(edges, widthArray, jenks);
                 Object(_modules_edges__WEBPACK_IMPORTED_MODULE_3__["calculateOffset"])(edges, origLineWidth);
                 Object(_modules_edges__WEBPACK_IMPORTED_MODULE_3__["addWidthAttr"])(origLines, edges, origLineWidth, cargoTypes);
-                nodes.features.forEach(node => {
-                    Object(_modules_nodes__WEBPACK_IMPORTED_MODULE_4__["bindEdgesInfoToNodes"])(node, edges);
+                map.setZoom(10);
+
+                nodes.features.forEach(node => {  
+                    Object(_modules_nodes__WEBPACK_IMPORTED_MODULE_4__["bindEdgesInfoToNodes"])(node, edges, map);
                     Object(_modules_nodes__WEBPACK_IMPORTED_MODULE_4__["addNodeAttr"])(origLines, node, cargoTypes, map);
                 });
+
+                multipleCargoNodesObject = Object(_modules_nodes__WEBPACK_IMPORTED_MODULE_4__["createMultipleCargoNodesObject"])(cargoTypes, nodes);
                 // renderBackgroundLines(map, origLines, origLineWidth);
-                Object(_modules_render__WEBPACK_IMPORTED_MODULE_5__["renderEdges"])(map, edges, cargoColorArray, nodes);
-                Object(_modules_render__WEBPACK_IMPORTED_MODULE_5__["renderNodes"])(map, nodes);
+                Object(_modules_render__WEBPACK_IMPORTED_MODULE_5__["renderEdges"])(map, edges, cargoColorArray, nodes, multipleCargoNodesObject);
+                // renderNodes(map, nodes);
+
+                map.setZoom(currZoom);
             }
 
             // center and zoom map to data
@@ -423,6 +422,12 @@ window.onload = () => {
         }
 
     });
+    map.on('zoomend', function () {
+        document.getElementById('zoom-level').innerHTML = 'Zoom Level: ' + map.getZoom();
+    });
+
+    const to10ZoomBtn = document.getElementById('to-10-zoom-level');
+    to10ZoomBtn.addEventListener('click', () => map.setZoom(10));
 };
 
 
@@ -2122,7 +2127,7 @@ function createSlider(el, minWidthDefault, maxWidthDefault, maxWidth) {
       start: [minWidthDefault, maxWidthDefault],
       connect: true,
       range: {
-          'min': [minWidthDefault, 1],
+          'min': [0, 1],
           'max': [maxWidth]
       }
   });
@@ -2137,6 +2142,7 @@ function toggleLayerVisibility(layerCheckbox, map, layerId) {
       map.setLayoutProperty(layerId, 'visibility', 'none');
   }
 }
+
 /* WEBPACK VAR INJECTION */}.call(this, __webpack_require__(/*! nouislider */ "./node_modules/nouislider/distribute/nouislider.js")))
 
 /***/ }),
@@ -2145,7 +2151,7 @@ function toggleLayerVisibility(layerCheckbox, map, layerId) {
 /*!*****************************!*\
   !*** ./js/modules/nodes.js ***!
   \*****************************/
-/*! exports provided: bindEdgesInfoToNodes, findAdjacentLines, fillAdjacentLinesAttr, addNodeAttr */
+/*! exports provided: bindEdgesInfoToNodes, findAdjacentLines, fillAdjacentLinesAttr, addNodeAttr, createMultipleCargoNodesObject */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -2154,42 +2160,59 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "findAdjacentLines", function() { return findAdjacentLines; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "fillAdjacentLinesAttr", function() { return fillAdjacentLinesAttr; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "addNodeAttr", function() { return addNodeAttr; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "createMultipleCargoNodesObject", function() { return createMultipleCargoNodesObject; });
 /* harmony import */ var _edges__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./edges */ "./js/modules/edges.js");
 
 
 
-function bindEdgesInfoToNodes(node, edges) {
+function bindEdgesInfoToNodes(node, edges, map) {
     let nodeID = node.properties.OBJECTID;
     let inEdges = [];
     let outEdges = [];
-    
+    let filledAdjacentLines = [];
+
     edges.features.forEach(e => {
         let edgesProps = e.properties;
         let edgeID = e.id;
         let edgeGeom = e.geometry.coordinates;
         let numOfPoints = edgeGeom.length;
-        if (edgesProps.src === nodeID && edgesProps.value !== 0) {
-            outEdges.push({
-                'id': edgeID,
-                'type': edgesProps.type,
-                'value': edgesProps.value,
-                'width': edgesProps.width,
-                'offset': edgesProps.offset,
-                'lineID': edgesProps.ID_line,
-                'secondPoint': edgeGeom[1]
-            });
-        } else if (edgesProps.dest === nodeID && edgesProps.value !== 0) {
-            inEdges.push({
-                'id': edgeID,
-                'type': edgesProps.type,
-                'value': edgesProps.value,
-                'width': edgesProps.width,
-                'offset': edgesProps.offset,
-                'lineID': edgesProps.ID_line,
-                'beforeLastPoint': edgeGeom[numOfPoints - 2]
-            });
+
+        if (edgesProps.value !== 0) {
+            if (edgesProps.src === nodeID) {
+                outEdges.push({
+                    'id': edgeID,
+                    'type': edgesProps.type,
+                    'value': edgesProps.value,
+                    'width': edgesProps.width,
+                    'offset': edgesProps.offset,
+                    'lineID': edgesProps.ID_line,
+                    'secondPoint': map.project(edgeGeom[1])
+                });
+
+                if (!filledAdjacentLines.includes(edgesProps.ID_line)) {
+                    filledAdjacentLines.push(edgesProps.ID_line);
+                }
+            } else if (edgesProps.dest === nodeID) {
+                inEdges.push({
+                    'id': edgeID,
+                    'type': edgesProps.type,
+                    'value': edgesProps.value,
+                    'width': edgesProps.width,
+                    'offset': edgesProps.offset,
+                    'lineID': edgesProps.ID_line,
+                    'beforeLastPoint': map.project(edgeGeom[numOfPoints - 2])
+                });
+
+                if (!filledAdjacentLines.includes(edgesProps.ID_line)) {
+                    filledAdjacentLines.push(edgesProps.ID_line);
+                }
+            }
+
         }
+
     });
+
+    node.properties.filledAdjacentLines = filledAdjacentLines;
 
     node.properties.inEdges = inEdges;
     node.properties.outEdges = outEdges;
@@ -2198,38 +2221,47 @@ function bindEdgesInfoToNodes(node, edges) {
 
 // function to find lines that adjacent to specific node
 function findAdjacentLines(edges, nodeID) {
-  var adjacentLines = [];
+    var adjacentLines = [];
 
-  edges.features.forEach(e => {
-      if (e.properties.src === nodeID || e.properties.dest === nodeID) {
-          if (adjacentLines.indexOf(e.properties.ID_line) === -1) {
-              adjacentLines.push(e.properties.ID_line);
-          }
-      }
-  });
+    edges.features.forEach(e => {
+        if (e.properties.src === nodeID || e.properties.dest === nodeID) {
+            if (adjacentLines.indexOf(e.properties.ID_line) === -1) {
+                adjacentLines.push(e.properties.ID_line);
+            }
+        }
+    });
 
-  return adjacentLines;
+    return adjacentLines;
 }
 
 // function to fill adjacent lines attribute to nodes
 function fillAdjacentLinesAttr(nodes, edges) {
-  nodes.features.forEach(node => {
-      node.properties.adjacentLines = findAdjacentLines(edges, node.properties.OBJECTID);
-  });
+    nodes.features.forEach(node => {
+        node.properties.adjacentLines = findAdjacentLines(edges, node.properties.OBJECTID);
+    });
 }
 
 // function to calculate node radius
 function addNodeAttr(origLines, node, cargoTypes, map) {
 
-  var adjacentLines = node.properties.adjacentLines;
-  var maxWidth = Object(_edges__WEBPACK_IMPORTED_MODULE_0__["calculateMaxWidth"])(origLines, adjacentLines);
-  node.properties.radius = maxWidth - 1;
+    var adjacentLines = node.properties.adjacentLines;
+    var filledAdjacentLines = node.properties.filledAdjacentLines;
+
+    if (filledAdjacentLines.length === 1) {
+        node.properties.deadEnd = true;
+    } else {
+        node.properties.deadEnd = false;
+    }
 
 
-  cargoTypes.forEach(cargo => {
-      const cornerPoints = getTapeCornersPoints(map, node, cargo);
-      addRadiusAndTranslate(node, cargo, cornerPoints, map);
-  });
+    var maxWidth = Object(_edges__WEBPACK_IMPORTED_MODULE_0__["calculateMaxWidth"])(origLines, adjacentLines);
+    node.properties.radius = maxWidth - 1;
+
+
+    cargoTypes.forEach(cargo => {
+        const cornersPoints = getTapeCornersPoints(map, node, cargo);
+        addRadiusAndPosition(node, cargo, cornersPoints, map);
+    });
 
 }
 
@@ -2255,8 +2287,10 @@ function getSameCargoEdges(node, cargoType) {
 // function to get coordinates of tapes corners
 function getTapeCornersPoints(map, node, cargoType) {
     const cornersPoints = [];
-    
+
     const nodeGeomPix = map.project(node.geometry.coordinates);
+
+    cornersPoints.push(nodeGeomPix);
 
     let vector, secondPoint;
 
@@ -2267,19 +2301,20 @@ function getTapeCornersPoints(map, node, cargoType) {
 
             // edge is output edge
             if (edge.hasOwnProperty('secondPoint')) {
-                secondPoint = map.project(edge.secondPoint);
+                secondPoint = edge.secondPoint;
                 vector = getVector(nodeGeomPix, secondPoint);
-            
-            // or edge is input edge
+
+                // or edge is input edge
             } else {
-                secondPoint = map.project(edge.beforeLastPoint);
+                secondPoint = edge.beforeLastPoint;
                 vector = getVector(secondPoint, nodeGeomPix);
             }
-    
-            const normalVector = getNormalVector(vector);
-            const dist = edge.offset + ( edge.width / 2 );
-            const corner = getCornerCoordinates(nodeGeomPix, normalVector, dist);
-    
+
+            const offsetAngle = getOffsetAngle(vector);
+
+            const dist = edge.offset + (edge.width / 2);
+            const corner = getCornerCoordinates(nodeGeomPix, dist, offsetAngle);
+
             cornersPoints.push(corner);
         });
     }
@@ -2288,25 +2323,25 @@ function getTapeCornersPoints(map, node, cargoType) {
 }
 
 // function to fill node attribute
-function addRadiusAndTranslate(node, cargoType, cornerPoints, map) {
+function addRadiusAndPosition(node, cargoType, cornersPoints, map) {
 
     const cargoRadiusName = `${cargoType}-radius`;
-    const cargoTranslateName = `${cargoType}-translate`;
+    const cargoPositionName = `${cargoType}-position`;
 
-    if (cornerPoints.length !== 0) {
-        const circle = makeCircle(cornerPoints);
+    if (cornersPoints.length !== 0) {
+        const circle = makeCircle(cornersPoints);
 
         node.properties[cargoRadiusName] = circle.r;
-    
-        const nodeGeomPix = map.project(node.geometry.coordinates);
-        
-        const xTranslate = circle.x - nodeGeomPix.x;
-        const yTranslate = circle.y - nodeGeomPix.y;
-    
-        node.properties[cargoTranslateName] = [xTranslate, yTranslate];
+
+        const coords = map.unproject([circle.x, circle.y]);
+        const lng = coords.lng;
+        const lat = coords.lat;
+
+        node.properties[cargoPositionName] = [lng, lat];
+
     } else {
         node.properties[cargoRadiusName] = 0;
-        node.properties[cargoTranslateName] = [0, 0];
+        node.properties[cargoPositionName] = node.geometry.coordinates;
     }
 
 }
@@ -2320,127 +2355,160 @@ function getVector(pt1, pt2) {
     }
 }
 
-// function to get normal vector to current vector
-function getNormalVector(vector) {
-    const vecLength = Math.sqrt((vector.x * vector.x) + (vector.y * vector.y));
+// function to get offset angle
+function getOffsetAngle(vector) {
+    const segmentAngle = Math.atan2(vector.y, vector.x);
+    const offsetAngle = segmentAngle + Math.PI/2;
 
-    return {
-        x: vector.x / vecLength,
-        y: vector.y / vecLength
-    }
+    return offsetAngle;
 }
 
-// function to get coordinates of tape corner (in pixels)
-function getCornerCoordinates(pt, normalVector, dist) {
-    const deltaX = normalVector.x * dist;
-    const deltaY = normalVector.y * dist;
-
+// function to get corner coordinates
+function getCornerCoordinates(pt, dist, offsetAngle) {
     return {
-        x: pt.x + deltaX,
-        y: pt.y + deltaY
-    }
+        x: pt.x + dist * Math.cos(offsetAngle),
+        y: pt.y + dist * Math.sin(offsetAngle)
+    };
+}
+
+// function to create object for specific type of cargo
+function createSingleCargoNodesObject(cargoType, nodes) {
+
+    const singleCargoNodesObject = { type: 'FeatureCollection', features: [] };
+    const cargoRadiusName = `${cargoType}-radius`;
+    const cargoPositionName = `${cargoType}-position`;
+
+    nodes.features.forEach(node => {
+        const cargoNode = {
+            type: "Feature",
+            properties: {
+                radius: node.properties[cargoRadiusName],
+                deadEnd: node.properties.deadEnd
+            },
+            geometry: {
+                type: "Point",
+                coordinates: node.properties[cargoPositionName]
+            }
+        };
+
+        singleCargoNodesObject.features.push(cargoNode);
+    });
+
+    return singleCargoNodesObject;
+}
+
+
+// function to create object for all types of cargos
+function createMultipleCargoNodesObject(cargoTypes, nodes) {
+    const multipleCargoNodesObject = {};
+
+    cargoTypes.forEach(cargo => {
+        multipleCargoNodesObject[cargo] = createSingleCargoNodesObject(cargo, nodes);
+    });
+
+    return multipleCargoNodesObject;
 }
 
 
 // FUNCTIONS TO GET MINIMUM BOUNDING CIRCLE
 // Initially: No boundary points known
 function makeCircle(points) {
-	// Clone list to preserve the caller's data, do Durstenfeld shuffle
-	var shuffled = points.slice();
-	for (var i = points.length - 1; i >= 0; i--) {
-		var j = Math.floor(Math.random() * (i + 1));
-		j = Math.max(Math.min(j, i), 0);
-		var temp = shuffled[i];
-		shuffled[i] = shuffled[j];
-		shuffled[j] = temp;
-	}
-	
-	// Progressively add points to circle or recompute circle
-	var c = null;
-	shuffled.forEach(function(p, i) {
-		if (c === null || !isInCircle(c, p))
-			c = makeCircleOnePoint(shuffled.slice(0, i + 1), p);
-	});
-	return c;
+    // Clone list to preserve the caller's data, do Durstenfeld shuffle
+    var shuffled = points.slice();
+    for (var i = points.length - 1; i >= 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        j = Math.max(Math.min(j, i), 0);
+        var temp = shuffled[i];
+        shuffled[i] = shuffled[j];
+        shuffled[j] = temp;
+    }
+
+    // Progressively add points to circle or recompute circle
+    var c = null;
+    shuffled.forEach(function (p, i) {
+        if (c === null || !isInCircle(c, p))
+            c = makeCircleOnePoint(shuffled.slice(0, i + 1), p);
+    });
+    return c;
 }
 
 
 // One boundary point known
 function makeCircleOnePoint(points, p) {
-	var c = {x: p.x, y: p.y, r: 0};
-	points.forEach(function(q, i) {
-		if (!isInCircle(c, q)) {
-			if (c.r == 0)
-				c = makeDiameter(p, q);
-			else
-				c = makeCircleTwoPoints(points.slice(0, i + 1), p, q);
-		}
-	});
-	return c;
+    var c = { x: p.x, y: p.y, r: 0 };
+    points.forEach(function (q, i) {
+        if (!isInCircle(c, q)) {
+            if (c.r == 0)
+                c = makeDiameter(p, q);
+            else
+                c = makeCircleTwoPoints(points.slice(0, i + 1), p, q);
+        }
+    });
+    return c;
 }
 
 
 // Two boundary points known
 function makeCircleTwoPoints(points, p, q) {
-	var circ = makeDiameter(p, q);
-	var left  = null;
-	var right = null;
-	
-	// For each point not in the two-point circle
-	points.forEach(function(r) {
-		if (isInCircle(circ, r))
-			return;
-		
-		// Form a circumcircle and classify it on left or right side
-		var cross = crossProduct(p.x, p.y, q.x, q.y, r.x, r.y);
-		var c = makeCircumcircle(p, q, r);
-		if (c === null)
-			return;
-		else if (cross > 0 && (left === null || crossProduct(p.x, p.y, q.x, q.y, c.x, c.y) > crossProduct(p.x, p.y, q.x, q.y, left.x, left.y)))
-			left = c;
-		else if (cross < 0 && (right === null || crossProduct(p.x, p.y, q.x, q.y, c.x, c.y) < crossProduct(p.x, p.y, q.x, q.y, right.x, right.y)))
-			right = c;
-	});
-	
-	// Select which circle to return
-	if (left === null && right === null)
-		return circ;
-	else if (left === null && right !== null)
-		return right;
-	else if (left !== null && right === null)
-		return left;
-	else if (left !== null && right !== null)
-		return left.r <= right.r ? left : right;
-	else
-		throw "Assertion error";
+    var circ = makeDiameter(p, q);
+    var left = null;
+    var right = null;
+
+    // For each point not in the two-point circle
+    points.forEach(function (r) {
+        if (isInCircle(circ, r))
+            return;
+
+        // Form a circumcircle and classify it on left or right side
+        var cross = crossProduct(p.x, p.y, q.x, q.y, r.x, r.y);
+        var c = makeCircumcircle(p, q, r);
+        if (c === null)
+            return;
+        else if (cross > 0 && (left === null || crossProduct(p.x, p.y, q.x, q.y, c.x, c.y) > crossProduct(p.x, p.y, q.x, q.y, left.x, left.y)))
+            left = c;
+        else if (cross < 0 && (right === null || crossProduct(p.x, p.y, q.x, q.y, c.x, c.y) < crossProduct(p.x, p.y, q.x, q.y, right.x, right.y)))
+            right = c;
+    });
+
+    // Select which circle to return
+    if (left === null && right === null)
+        return circ;
+    else if (left === null && right !== null)
+        return right;
+    else if (left !== null && right === null)
+        return left;
+    else if (left !== null && right !== null)
+        return left.r <= right.r ? left : right;
+    else
+        throw "Assertion error";
 }
 
 
 function makeDiameter(a, b) {
-	var cx = (a.x + b.x) / 2;
-	var cy = (a.y + b.y) / 2;
-	var r0 = distance(cx, cy, a.x, a.y);
-	var r1 = distance(cx, cy, b.x, b.y);
-	return {x: cx, y: cy, r: Math.max(r0, r1)};
+    var cx = (a.x + b.x) / 2;
+    var cy = (a.y + b.y) / 2;
+    var r0 = distance(cx, cy, a.x, a.y);
+    var r1 = distance(cx, cy, b.x, b.y);
+    return { x: cx, y: cy, r: Math.max(r0, r1) };
 }
 
 
 function makeCircumcircle(a, b, c) {
-	// Mathematical algorithm from Wikipedia: Circumscribed circle
-	var ox = (Math.min(a.x, b.x, c.x) + Math.max(a.x, b.x, c.x)) / 2;
-	var oy = (Math.min(a.y, b.y, c.y) + Math.max(a.y, b.y, c.y)) / 2;
-	var ax = a.x - ox,  ay = a.y - oy;
-	var bx = b.x - ox,  by = b.y - oy;
-	var cx = c.x - ox,  cy = c.y - oy;
-	var d = (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by)) * 2;
-	if (d == 0)
-		return null;
-	var x = ox + ((ax*ax + ay*ay) * (by - cy) + (bx*bx + by*by) * (cy - ay) + (cx*cx + cy*cy) * (ay - by)) / d;
-	var y = oy + ((ax*ax + ay*ay) * (cx - bx) + (bx*bx + by*by) * (ax - cx) + (cx*cx + cy*cy) * (bx - ax)) / d;
-	var ra = distance(x, y, a.x, a.y);
-	var rb = distance(x, y, b.x, b.y);
-	var rc = distance(x, y, c.x, c.y);
-	return {x: x, y: y, r: Math.max(ra, rb, rc)};
+    // Mathematical algorithm from Wikipedia: Circumscribed circle
+    var ox = (Math.min(a.x, b.x, c.x) + Math.max(a.x, b.x, c.x)) / 2;
+    var oy = (Math.min(a.y, b.y, c.y) + Math.max(a.y, b.y, c.y)) / 2;
+    var ax = a.x - ox, ay = a.y - oy;
+    var bx = b.x - ox, by = b.y - oy;
+    var cx = c.x - ox, cy = c.y - oy;
+    var d = (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by)) * 2;
+    if (d == 0)
+        return null;
+    var x = ox + ((ax * ax + ay * ay) * (by - cy) + (bx * bx + by * by) * (cy - ay) + (cx * cx + cy * cy) * (ay - by)) / d;
+    var y = oy + ((ax * ax + ay * ay) * (cx - bx) + (bx * bx + by * by) * (ax - cx) + (cx * cx + cy * cy) * (bx - ax)) / d;
+    var ra = distance(x, y, a.x, a.y);
+    var rb = distance(x, y, b.x, b.y);
+    var rc = distance(x, y, c.x, c.y);
+    return { x: x, y: y, r: Math.max(ra, rb, rc) };
 }
 
 
@@ -2449,26 +2517,27 @@ function makeCircumcircle(a, b, c) {
 var MULTIPLICATIVE_EPSILON = 1 + 1e-14;
 
 function isInCircle(c, p) {
-	return c !== null && distance(p.x, p.y, c.x, c.y) <= c.r * MULTIPLICATIVE_EPSILON;
+    return c !== null && distance(p.x, p.y, c.x, c.y) <= c.r * MULTIPLICATIVE_EPSILON;
 }
 
 
 // Returns twice the signed area of the triangle defined by (x0, y0), (x1, y1), (x2, y2).
 function crossProduct(x0, y0, x1, y1, x2, y2) {
-	return (x1 - x0) * (y2 - y0) - (y1 - y0) * (x2 - x0);
+    return (x1 - x0) * (y2 - y0) - (y1 - y0) * (x2 - x0);
 }
 
 
 function distance(x0, y0, x1, y1) {
-	return Math.hypot(x0 - x1, y0 - y1);
+    return Math.hypot(x0 - x1, y0 - y1);
 }
 
 
 if (!("hypot" in Math)) {  // Polyfill
-	Math.hypot = function(x, y) {
-		return Math.sqrt(x * x + y * y);
-	};
+    Math.hypot = function (x, y) {
+        return Math.sqrt(x * x + y * y);
+    };
 }
+
 
 /***/ }),
 
@@ -2524,18 +2593,22 @@ __webpack_require__.r(__webpack_exports__);
 // }
 
 // function to render edges
-function renderEdges(map, edges, cargoColorArray, nodes) {
+function renderEdges(map, edges, cargoColorArray, nodes, multipleCargoNodesObject) {
+
+    const reverseCargoArray = cargoColorArray.slice().reverse();
 
     if (map.getSource('edges')) {
         map.getSource('edges').setData(edges);
-        map.getSource('junction-nodes').setData(nodes);
+
+        reverseCargoArray.forEach(cargoObj => {
+            map.getSource(`${cargoObj.type}-nodes`).setData(multipleCargoNodesObject[cargoObj.type]);
+        });
+
 
     } else {
 
         map.addSource("edges", { type: "geojson", data: edges });
-        map.addSource("junction-nodes", { type: "geojson", data: nodes });
-
-        let reverseCargoArray = cargoColorArray.slice().reverse();
+        // map.addSource("junction-nodes", { type: "geojson", data: nodes });
 
         // add array of layers to map (one for each type of cargo)
         reverseCargoArray.forEach(cargoObj => {
@@ -2552,15 +2625,60 @@ function renderEdges(map, edges, cargoColorArray, nodes) {
                 "paint": {
                     'line-color': cargoObj.color,
                     "line-opacity": 1,
+                    // "line-offset": ['get', 'offset'],
                     'line-offset': [
                         'interpolate', ['linear'], ['zoom'],
-                        5, ['/', ['get', 'offset'], 10],
-                        10, ['get', 'offset']
+                        1, ['/', ['get', 'offset'], 512],
+                        2, ['/', ['get', 'offset'], 256],
+                        3, ['/', ['get', 'offset'], 128],
+                        4, ['/', ['get', 'offset'], 64],
+                        5, ['/', ['get', 'offset'], 32],
+                        6, ['/', ['get', 'offset'], 16],
+                        7, ['/', ['get', 'offset'], 8],
+                        8, ['/', ['get', 'offset'], 4],
+                        9, ['/', ['get', 'offset'], 2],
+                        10, ['get', 'offset'],
+                        11, ['*', ['get', 'offset'], 2],
+                        12, ['*', ['get', 'offset'], 4],
+                        13, ['*', ['get', 'offset'], 8],
+                        14, ['*', ['get', 'offset'], 16],
+                        15, ['*', ['get', 'offset'], 32],
+                        16, ['*', ['get', 'offset'], 64],
+                        17, ['*', ['get', 'offset'], 128],
+                        18, ['*', ['get', 'offset'], 256],
+                        19, ['*', ['get', 'offset'], 512],
+                        20, ['*', ['get', 'offset'], 1024],
+                        21, ['*', ['get', 'offset'], 2048],
+                        22, ['*', ['get', 'offset'], 4096],
+
+                        // 22, ['*', ['get', 'offset'], 1],
                     ],
+                    // "line-width": ['get', 'width']
                     "line-width": [
                         'interpolate', ['linear'], ['zoom'],
-                        5, ['/', ['get', 'width'], 10],
-                        10, ['get', 'width']
+                        1, ['/', ['get', 'width'], 512],
+                        2, ['/', ['get', 'width'], 256],
+                        3, ['/', ['get', 'width'], 128],
+                        4, ['/', ['get', 'width'], 64],
+                        5, ['/', ['get', 'width'], 32],
+                        6, ['/', ['get', 'width'], 16],
+                        7, ['/', ['get', 'width'], 8],
+                        8, ['/', ['get', 'width'], 4],
+                        9, ['/', ['get', 'width'], 2],
+                        10, ['get', 'width'],
+                        11, ['*', ['get', 'width'], 2],
+                        12, ['*', ['get', 'width'], 4],
+                        13, ['*', ['get', 'width'], 8],
+                        14, ['*', ['get', 'width'], 16],
+                        15, ['*', ['get', 'width'], 32],
+                        16, ['*', ['get', 'width'], 64],
+                        17, ['*', ['get', 'width'], 128],
+                        18, ['*', ['get', 'width'], 256],
+                        19, ['*', ['get', 'width'], 512],
+                        20, ['*', ['get', 'width'], 1024],
+                        21, ['*', ['get', 'width'], 2048],
+                        22, ['*', ['get', 'width'], 4096],
+                        // 22, ['*', ['get', 'width'], 1],
                     ]
                 }
             });
@@ -2570,19 +2688,45 @@ function renderEdges(map, edges, cargoColorArray, nodes) {
             const cargoRadiusName = `${cargoObj.type}-radius`;
             const cargoTranslateName = `${cargoObj.type}-translate`;
 
+            map.addSource(`${cargoObj.type}-nodes`, { type: "geojson", data: multipleCargoNodesObject[cargoObj.type] });
+
             map.addLayer({
                 "id": cargoObj.type + "-nodes",
-                "source": "junction-nodes",
+                "source": `${cargoObj.type}-nodes`,
                 "type": "circle",
-                "filter": ["!=", ['get', cargoRadiusName], 0],
+                // "filter": [
+                //     "all",
+                //     ["!=", "deadEnd", true],
+                //     ["!=", "radius", 0]
+                // ],
+                "filter": ["!=", "radius", 0],
                 "paint": {
                     "circle-color": cargoObj.color,
                     "circle-radius": [
                         'interpolate', ['linear'], ['zoom'],
-                        5, ['/', ['get', cargoRadiusName], 10],
-                        10, ['get', cargoRadiusName]
+                        1, ['/', ['get', 'radius'], 512],
+                        2, ['/', ['get', 'radius'], 256],
+                        3, ['/', ['get', 'radius'], 128],
+                        4, ['/', ['get', 'radius'], 64],
+                        5, ['/', ['get', 'radius'], 32],
+                        6, ['/', ['get', 'radius'], 16],
+                        7, ['/', ['get', 'radius'], 8],
+                        8, ['/', ['get', 'radius'], 4],
+                        9, ['/', ['get', 'radius'], 2],
+                        10, ['get', 'radius'],
+                        11, ['*', ['get', 'radius'], 2],
+                        12, ['*', ['get', 'radius'], 4],
+                        13, ['*', ['get', 'radius'], 8],
+                        14, ['*', ['get', 'radius'], 16],
+                        15, ['*', ['get', 'radius'], 32],
+                        16, ['*', ['get', 'radius'], 64],
+                        17, ['*', ['get', 'radius'], 128],
+                        18, ['*', ['get', 'radius'], 256],
+                        19, ['*', ['get', 'radius'], 512],
+                        20, ['*', ['get', 'radius'], 1024],
+                        21, ['*', ['get', 'radius'], 2048],
+                        22, ['*', ['get', 'radius'], 4096],
                     ]
-                    // "circle-translate": ['get', cargoTranslateName]
                 }
             });
 
@@ -2617,7 +2761,12 @@ function renderNodes(map, nodes) {
             "id": "junctions",
             "source": "nodes",
             "type": "circle",
-            "filter": ["==", "NAME", "junction"],
+            "filter": [
+                "all",
+                ["==", "NAME", "junction"],
+                [">", "radius", 0]
+            ],
+            // "filter": ["==", "NAME", "junction"],
             'layout': {
                 'visibility': 'none'
             },
@@ -2625,11 +2774,11 @@ function renderNodes(map, nodes) {
                 "circle-color": "#c4c4c4",
                 "circle-radius": [
                     'interpolate', ['linear'], ['zoom'],
-                    5, ['/', ['get', 'radius'], 10],
-                    10, ['get', 'radius']
+                    1, ['/', 5, 2],
+                    10, 5
                 ],
                 "circle-stroke-color": "#000000",
-                "circle-stroke-width": 2
+                "circle-stroke-width": 1
             }
         });
 
@@ -2638,19 +2787,20 @@ function renderNodes(map, nodes) {
             "id": "cities",
             "source": "nodes",
             "type": "circle",
-            "filter": ["!=", "NAME", "junction"],
-            'layout': {
-                'visibility': 'none'
-            },
+            "filter": [
+                "all",
+                ["!=", "NAME", "junction"],
+                [">", "radius", 0]
+            ],
             "paint": {
-                "circle-color": "#ffffff",
+                "circle-color": "#000",
                 "circle-radius": [
                     'interpolate', ['linear'], ['zoom'],
-                    5, ['/', ['get', 'radius'], 10],
-                    10, ['get', 'radius']
+                    1, ['/', 5, 2],
+                    10, 5
                 ],
-                "circle-stroke-color": "#000000",
-                "circle-stroke-width": 2
+                "circle-stroke-color": "#000",
+                "circle-stroke-width": 1
             }
         });
 
@@ -2665,11 +2815,10 @@ function renderNodes(map, nodes) {
                 "text-field": "{NAME}",
                 "text-size": [
                     'interpolate', ['linear'], ['zoom'],
-                    5, ['/', ['get', 'radius'], 3],
-                    10, ['get', 'radius']
+                    1, ['/', 25, 2],
+                    10, 25
                 ],
-                "text-offset": [1.2, -1.5],
-                'visibility': 'none'
+                "text-offset": [1, -1]
             },
             "paint": {
                 "text-color": "#000000",
@@ -2708,6 +2857,7 @@ function renderOrigLines(map, origLines, origLineWidth) {
         });
     }
 }
+
 
 /***/ }),
 
